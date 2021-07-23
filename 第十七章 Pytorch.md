@@ -238,9 +238,44 @@ print(f"n: {n}")
 
 # 3 Autograd的讲解🌟🌟🌟
 
+学习目标：*本节主要介绍Pytorch中Autograd模块的作用以及用法。*
+
+相关知识点：
+
+*前向传播，反向传播*
+
 ## PART1 模型中的前向传播与反向传播
 
+在上一章里，我们已经介绍过神经网络中的前向传播和反向传播的概念，在这做一个简单的回顾。对于神经网络的优化，一般分为两个步骤:第一步为前向传播，也就是给定训练数据，通过前向传播计算出模型中每个节点的输出;第二步则为反向传播，通过这一步计算出每一个参数的梯度，最后做参数的更新。实际上，Pytorch中的autograd模块就是替我们完成这些事情! 
+
+***（反向传播是为了计算梯度）***
+
+下面，我们来看一个具体的例子。首先，导入已经训练好的restnet模型，同时也构建一个随机样本。这个样本为一张64*64的图片且每一个像素由RGB来表示，对应的标签为一个整数。
+
+```python
+import torch, torchvision
+model = torchvision.models.resnet18(pretrained=True)
+data = torch.rand(1, 3, 64, 64)
+labels = torch.rand(1, 1000)
+for itr in range(10):
+  prediction = model(data) # forward pass
+  loss = torch.abs(prediction - labels).sum()
+  loss.backward() # backward pass
+  optim = torch.optim.SGD(model.parameters(), lr=1e-3, momentum=0.9)
+  optim.step() #gradient descent
+ 
+  print (loss)
+```
+
 ## PART2 利用autograd计算梯度
+
+对于autograd再看一个例子，用来加深对它的理解。假如有两个Tensor分别为a和b， 同时**设置requires_grad=True**， 这样的结果就是autograd会保存对于相应变量的操作。
+
+![image-20210723215454165](/Users/yunwanxu/Library/Application Support/typora-user-images/image-20210723215454165.png)
+
+
+
+
 
 # 4 构建神经网络模型🌟🌟🌟
 
@@ -268,19 +303,12 @@ print(f"n: {n}")
 
 ```python
 # make fake data
-
 n_data = torch.ones(100, 2)
-
 x0 = torch.normal(2*n_data, 1)      # class0 x data (tensor), shape=(100, 2)
-
 y0 = torch.zeros(100)               # class0 y data (tensor), shape=(100, 1)
-
 x1 = torch.normal(-2*n_data, 1)     # class1 x data (tensor), shape=(100, 2)
-
 y1 = torch.ones(100)                # class1 y data (tensor), shape=(100, 1)
-
 x = torch.cat((x0, x1), 0).type(torch.FloatTensor)  # shape (200, 2) FloatTensor = 32-bit floating
-
 y = torch.cat((y0, y1), ).type(torch.LongTensor)    # shape (200,) LongTensor = 64-bit integer
 ```
 
@@ -292,22 +320,16 @@ y = torch.cat((y0, y1), ).type(torch.LongTensor)    # shape (200,) LongTensor = 
 
 ```python
 class Net(torch.nn.Module):
+  
+  def __init__(self, n_feature, n_hidden, n_output):
+    super(Net, self).__init__()
+    self.hidden = torch.nn.Linear(n_feature, n_hidden)   # hidden layer
+    self.out = torch.nn.Linear(n_hidden, n_output)   # output layer
 
-def __init__(self, n_feature, n_hidden, n_output):
-
-super(Net, self).__init__()
-
-self.hidden = torch.nn.Linear(n_feature, n_hidden)   # hidden layer
-
-self.out = torch.nn.Linear(n_hidden, n_output)   # output layer
-
-def forward(self, x):
-
-x = F.relu(self.hidden(x))      # activation function for hidden layer
-
-x = self.out(x)
-
-return x
+  def forward(self, x):
+    x = F.relu(self.hidden(x))      # activation function for hidden layer
+    x = self.out(x)
+    return x
 
 net = Net(n_feature=2, n_hidden=10, n_output=2)     # define the network
 ```
@@ -328,38 +350,31 @@ loss_func = torch.nn.CrossEntropyLoss()  # the target label is NOT an one-hotted
 
 ```python
 for t in range(50):
+  out = net(x)
+  loss = loss_func(out, y)
+  optimizer.zero_grad()   # clear gradients for next train
+  loss.backward()         # backpropagation, compute gradients
+  optimizer.step()        # apply gradients
 
-out = net(x)
-
-loss = loss_func(out, y)
-
-optimizer.zero_grad()   # clear gradients for next train
-
-loss.backward()         # backpropagation, compute gradients
-
-optimizer.step()        # apply gradients
-
-if t % 2 == 0:
-
-prediction = torch.max(out, 1)[1]
-
-pred_y = prediction.data.numpy()
-
-target_y = y.data.numpy()
-
-accuracy = float((pred_y == target_y).astype(int).sum()) / float(target_y.size)
-
-print ('Accuracy=%.2f' % accuracy)
-
-plt.pause(0.1)
+  if t % 2 == 0:
+    prediction = torch.max(out, 1)[1]
+    pred_y = prediction.data.numpy()
+    target_y = y.data.numpy()
+    accuracy = float((pred_y == target_y).astype(int).sum()) / float(target_y.size)
+    print ('Accuracy=%.2f' % accuracy)
+    plt.pause(0.1)
 ```
 
+总结，四步：
 
+- 前向传播`out = net(x)`
+- 计算loss`loss = loss_func(out, y)`  （清楚gradient是辅助步骤）
+- 后向传播（计算梯度）`loss.backward()  `
+- 应用梯度` optimizer.step()  `
 
 ## PART5 完整的程序
 
 ```python
-
 """
 View more, visit my tutorial page: https://mofanpy.com/tutorials/
 My Youtube Channel: https://www.youtube.com/user/MorvanZhou
